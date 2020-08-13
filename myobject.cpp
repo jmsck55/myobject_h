@@ -1,0 +1,1245 @@
+
+// Not thread safe.
+
+#include "stdafx.h"
+#include "myobject.h"
+
+static void del_object(object& data) {
+	SIZE_T i, len;
+	object * ob;
+	len = LENGTH(data);
+	ob = (object *)data.ptr;
+	for (i = 0; i < len; i++) {
+		if (COUNT(*ob) > 0) {
+			ob->count--;
+		}
+		if (IS_SEQUENCE(*ob)) {
+			if (LENGTH(*ob) != 0) {
+				del_object(*ob);
+			}
+		}
+		ob++;
+	}
+	if (COUNT(data) == 0) {
+		delete[](object *)data.ptr;
+	}
+}
+
+// delete just one entire object (sequence or atom)
+void delete_object(object& data) {
+	if (COUNT(data) > 0) {
+		data.count--;
+	}
+	if (IS_SEQUENCE(data)) {
+		if (LENGTH(data) != 0) {
+			del_object(data);
+		}
+	}
+}
+
+
+void myobject::del_myobject() {
+	SIZE_T i, len;
+	myobject * ob;
+	len = LENGTH(data);
+	ob = (myobject *)data.ptr;
+	for (i = 0; i < len; i++) {
+		if (COUNT(ob->data) > 0) {
+			ob->data.count--;
+		}
+		if (IS_SEQUENCE(ob->data)) {
+			if (LENGTH(ob->data) != 0) {
+				ob->del_myobject();
+			}
+		}
+		ob++;
+	}
+	if (COUNT(data) == 0) {
+		delete[](myobject *)data.ptr;
+	}
+}
+
+// delete just one entire myobject (sequence or atom)
+void myobject::delete_myobject() {
+	if (COUNT(data) > 0) {
+		data.count--;
+	}
+	if (IS_SEQUENCE(data)) {
+		if (LENGTH(data) != 0) {
+			del_myobject();
+		}
+	}
+}
+
+
+myobject::~myobject()
+{
+	delete_myobject();
+}
+
+
+// Operators:
+
+// add: delete_myobject()
+// before I modify "myobject" or "this", I have to free it with delete_myobject()
+
+// Assignment operators:
+
+myobject& myobject::operator= (myobject& param) {
+	// if it is the only one, then
+	if ((data.up == NULL) || (data.count == 0)) { // data is a toplevel object
+		// data.count is how many toplevel duplicate copies there are of that sequence
+		delete_myobject(); // decrement data.count in all down-stream nested objects, or delete[]
+		// replace
+		// copy all down-stream objects
+		if (param.data.up == NULL) { // param is the toplevel
+			param.set_duplicate_count(param.data.count + 1);
+			data = param.data;
+			return *this;
+		}
+		else {
+			data = param.dup_myobject(data.up, NULL);
+			return *this;
+		}
+	}
+	// if (data.up != NULL) {
+	// if (data.count > 0) {
+	else {
+		myobject * topmost;
+		myobject * ptr;
+		// start with pointer to top-most level
+		topmost = NULL;
+		ptr = (myobject *)data.up;
+		while (ptr != NULL) {
+			topmost = ptr;
+			ptr = (myobject *)topmost->data.up;
+		}
+		// set do_not_copy_flag
+		data.is_dont_copy = 1;
+		// duplicate sequence, set count to zero (0), (without copying any down-stream of do_not_copy_flag)
+		// then set flag in function, so that it will not copy any down-stream
+		// un-set do_not_copy_flag
+		// data = param.data;
+		topmost->data = topmost->dup_myobject(NULL, &param);
+		//delete_myobject(); // the whole thing
+		topmost->delete_myobject(); // decrements count, or uses delete[]
+		return *this;
+	}
+}
+
+myobject& myobject::operator= (long long i) {
+	myobject param(i);
+	*this = param;
+	// preserve count
+	//--here--
+	return *this;
+}
+myobject& myobject::operator= (double f) {
+	delete_myobject();
+	MAKE_EMPTY_SEQ();
+	data.dbl = f;
+	data.is_atom = 1;
+	return *this;
+}
+myobject& myobject::operator= (const char * str) {
+	SIZE_T n, i;
+	myobject * s;
+	myobject * a;
+	char * b;
+	delete_myobject();
+	MAKE_EMPTY_SEQ();
+	if (str == NULL) {
+		exit(1);
+		//MAKE_EMPTY_SEQ();
+		//return;
+	}
+	n = strnlen(str, (SIZE_T)0xFFFFFFFFFFFFFFFFull);
+	if (n == 0) {
+		return *this;
+	}
+	s = new myobject[n];
+	a = s;
+	b = (char *)str;
+	for (i = 0; i < n; i++) {
+		*a++ = (long long)*b++;
+	}
+	data.length64 = (unsigned long long)n;
+	data.ptr = s;
+	return *this;
+}
+myobject& myobject::operator= (const object& param) {
+	delete_myobject();
+	data = param;
+	return *this;
+}
+
+
+myobject& myobject::operator[] (SIZE_T index)
+{
+	if (index < LENGTH(data)) {
+		myobject * p;
+		p = (myobject *)data.ptr;
+		return p[index];
+	}
+	else {
+		exit(1);
+	}
+}
+
+#define assignment_op(T) \
+myobject& myobject::operator T (const myobject& param) { \
+	if (IS_ATOM(data)) { \
+		if (IS_ATOM(param.data)) { \
+			if (IS_INTEGER(data)) { \
+				if (IS_INTEGER(param.data)) { \
+					data.i64 T param.data.i64; \
+					return *this; \
+				} \
+				else { \
+					data.dbl = (double)data.i64; \
+					data.is_integer = 0; \
+					data.dbl T param.data.dbl; \
+					return *this; \
+				} \
+			} \
+			else { \
+				if (IS_INTEGER(param.data)) { \
+					data.dbl T (double)param.data.i64; \
+					return *this; \
+				} \
+				else { \
+					data.dbl T param.data.dbl; \
+					return *this; \
+				} \
+			} \
+		} \
+		else { \
+			exit(1); \
+		} \
+	} \
+	else { \
+		SIZE_T i, len; \
+		myobject * a; \
+		if (IS_ATOM(param.data)) { \
+			len = LENGTH(data); \
+			a = (myobject *)data.ptr; \
+			for (i = 0; i < len; i++) { \
+				*a++ T param; \
+			} \
+			return *this; \
+		} \
+		else { \
+			myobject * b; \
+			len = LENGTH(data); \
+			if (len != LENGTH(param.data)) { \
+				exit(1); \
+			} \
+			a = (myobject *)data.ptr; \
+			b = (myobject *)param.data.ptr; \
+			for (i = 0; i < len; i++) { \
+				*a++ T *b++; \
+			} \
+			return *this; \
+		} \
+	} \
+}
+
+#define int_assignment_op(T) \
+myobject& myobject::operator T (const myobject& param) { \
+	if (IS_ATOM(data)) { \
+		if (IS_ATOM(param.data)) { \
+			if (IS_INTEGER(data)) { \
+				if (IS_INTEGER(param.data)) { \
+					data.i64 T param.data.i64; \
+					return *this; \
+				} \
+			} \
+		} \
+	} \
+	else { \
+		SIZE_T i, len; \
+		myobject * a; \
+		if (IS_ATOM(param.data)) { \
+			len = LENGTH(data); \
+			a = (myobject *)data.ptr; \
+			for (i = 0; i < len; i++) { \
+				*a++ T param; \
+			} \
+			return *this; \
+		} \
+		else { \
+			myobject * b; \
+			len = LENGTH(data); \
+			if (len != LENGTH(param.data)) { \
+				exit(1); \
+			} \
+			a = (myobject *)data.ptr; \
+			b = (myobject *)param.data.ptr; \
+			for (i = 0; i < len; i++) { \
+				*a++ T *b++; \
+			} \
+			return *this; \
+		} \
+	} \
+	exit(1); \
+}
+
+
+assignment_op(+= )
+assignment_op(-= )
+assignment_op(*= )
+assignment_op(/= )
+
+int_assignment_op(%= )
+int_assignment_op(^= )
+int_assignment_op(&= )
+int_assignment_op(|= )
+
+int_assignment_op(<<= )
+int_assignment_op(>>= )
+
+
+#define myoperator(S,T) \
+myobject myobject::operator S (const myobject& param) { \
+	myobject tmp; \
+	if (IS_ATOM(data)) { \
+		if (IS_ATOM(param.data)) { \
+			tmp = myobject(*this, LENGTH(param.data)); \
+		} \
+		else { \
+			tmp = *this; \
+		} \
+	} \
+	else { \
+		tmp = *this; \
+	} \
+	tmp T param; \
+	return tmp; \
+}
+
+myoperator(+, +=)
+myoperator(-, -=)
+myoperator(*, *=)
+myoperator(/ , /=)
+
+myoperator(%, %=)
+myoperator(^, ^=)
+myoperator(&, &=)
+myoperator(| , |=)
+
+myoperator(<< , <<=)
+myoperator(>> , >>=)
+
+long long compare(myobject& a, myobject& b) {
+	if (a.is_atom()) {
+		if (b.is_atom()) {
+			if (a.is_integer()) {
+				if (b.is_integer()) {
+					long long c, d;
+					c = a.i64();
+					d = b.i64();
+					return (c > d) - (c < d);
+				}
+				else {
+					double c, d;
+					c = (double)a.i64();
+					d = b.dbl();
+					return (c > d) - (c < d);
+				}
+			}
+			else {
+				if (b.is_integer()) {
+					double c, d;
+					c = a.dbl();
+					d = (double)b.i64();
+					return (c > d) - (c < d);
+				}
+				else {
+					double c, d;
+					c = a.dbl();
+					d = b.dbl();
+					return (c > d) - (c < d);
+				}
+			}
+		}
+		else {
+			return -1;
+		}
+	}
+	else {
+		if (b.is_atom()) {
+			return 1;
+		}
+		else {
+			SIZE_T c, d;
+			long long e;
+			myobject *_a;
+			myobject *_b;
+			c = a.length();
+			d = b.length();
+			if (c != d) {
+				return (c > d) - (c < d);
+			}
+			else if(c == 0) {
+				exit(1);
+			}
+			_a = &a[0];
+			_b = &b[0];
+			for (c = 0; c < d; c++) {
+				e = compare(*_a++, *_b++);
+				if (e != 0) {
+					return e;
+				}
+			}
+			return 0;
+		}
+	}
+}
+
+bool equal(myobject& a, myobject& b) {
+	return compare(a, b) == 0;
+}
+
+bool operator< (myobject& a, myobject& b) {
+	return compare(a, b) == -1;
+}
+bool operator> (myobject& a, myobject& b) {
+	return compare(a, b) == 1;
+}
+bool operator== (myobject& a, myobject& b) {
+	return compare(a, b) == 0;
+}
+bool operator!= (myobject& a, myobject& b) {
+	return compare(a, b) != 0;
+}
+bool operator<= (myobject& a, myobject& b) {
+	return compare(a, b) <= 0;
+}
+bool operator>= (myobject& a, myobject& b) {
+	return compare(a, b) >= 0;
+}
+
+myobject operator-(myobject& ob) {
+	if (ob.is_integer()) {
+		myobject s(-ob.i64());
+		return s;
+	}
+	else if (ob.is_atom()) {
+		myobject s(-ob.dbl());
+		return s;
+	}
+	else {
+		SIZE_T len = ob.length();
+		myobject a(0LL);
+		myobject s(a, len);
+		SIZE_T i;
+		for (i = 0; i < len; i++) {
+			s[i] = -ob[i];
+		}
+		return s;
+	}
+}
+
+myobject operator~(myobject& ob) {
+	if (ob.is_integer()) {
+		myobject s(~ob.i64());
+		return s;
+	}
+	else if (ob.is_atom()) {
+		exit(1);
+	}
+	else {
+		SIZE_T len = ob.length();
+		myobject a(0LL);
+		myobject s(a, len);
+		myobject *_a;
+		myobject *_b;
+		SIZE_T i;
+		_a = &s;
+		_b = &ob;
+		for (i = 0; i < len; i++) {
+			*_a++ = ~*_b++;
+		}
+		return s;
+	}
+}
+
+// End of Operators
+
+myobject::myobject()
+{
+	MAKE_EMPTY_SEQ();
+}
+myobject::myobject(const object& a)
+{
+	data = a;
+}
+myobject::myobject(object * ob, SIZE_T length) {
+	MAKE_EMPTY_SEQ();
+	if (ob == NULL) {
+		exit(1);
+		//MAKE_EMPTY_SEQ();
+		//return;
+	}
+	if (length == 0) {
+		//MAKE_EMPTY_SEQ();
+		return;
+	}
+	data.length = length;
+	data.ptr = (void *)ob;
+}
+myobject::myobject(myobject * myob, SIZE_T length) {
+	MAKE_EMPTY_SEQ();
+	if (myob == NULL) {
+		exit(1);
+		//MAKE_EMPTY_SEQ();
+		//return;
+	}
+	if (length == 0) {
+		//MAKE_EMPTY_SEQ();
+		return;
+	}
+	data.length = length;
+	data.ptr = (void *)myob;
+}
+myobject::myobject(double dbl)
+{
+	MAKE_EMPTY_SEQ();
+	data.dbl = dbl;
+	data.is_atom = 1;
+}
+myobject::myobject(long long i)
+{
+	MAKE_EMPTY_SEQ();
+	data.i64 = i;
+	data.is_atom = 1;
+	data.is_integer = 1;
+}
+myobject::myobject(const char * str, SIZE_T length) {
+	if (str == NULL) {
+		exit(1);
+		//MAKE_EMPTY_SEQ();
+		//return;
+	}
+	else {
+		SIZE_T n, i;
+		myobject * s;
+		myobject * a;
+		char * b;
+		MAKE_EMPTY_SEQ();
+		n = strnlen_s(str, length);
+		if (n == 0) {
+			return;
+		}
+		s = new myobject[n];
+		a = s;
+		b = (char *)str;
+		for (i = 0; i < n; i++) {
+			*a++ = (long long)*b++;
+		}
+		data.length = n;
+		data.ptr = (void *)s;
+	}
+}
+myobject::myobject(const char * str) {
+	if (str == NULL) {
+		exit(1);
+		//MAKE_EMPTY_SEQ();
+		//return;
+	}
+	else {
+		SIZE_T n, i;
+		myobject * s;
+		myobject * a;
+		char * b;
+		MAKE_EMPTY_SEQ();
+		n = strnlen_s(str, (SIZE_T)LLONG_MAX);
+		if (n == 0) {
+			return;
+		}
+		s = new myobject[n];
+		a = s;
+		b = (char *)str;
+		for (i = 0; i < n; i++) {
+			*a++ = (long long)*b++;
+		}
+		data.length = n;
+		data.ptr = (void *)s;
+	}
+}
+myobject::myobject(const long long * ptr, SIZE_T n) {
+	if (ptr == NULL) {
+		exit(1);
+		//MAKE_EMPTY_SEQ();
+		//return;
+	}
+	MAKE_EMPTY_SEQ();
+	if (n == 0) {
+		return;
+	}
+	else {
+		SIZE_T i;
+		myobject * s;
+		myobject * a;
+		long long * b;
+		s = new myobject[n];
+		a = s;
+		b = (long long *)ptr;
+		for (i = 0; i < n; i++) {
+			*a++ = *b++;
+		}
+		data.length = n;
+		data.ptr = (void *)s;
+	}
+}
+myobject::myobject(const double * ptr, SIZE_T n) {
+	if (ptr == NULL) {
+		exit(1);
+		//MAKE_EMPTY_SEQ();
+		//return;
+	}
+	MAKE_EMPTY_SEQ();
+	if (n == 0) {
+		return;
+	}
+	else {
+		SIZE_T i;
+		myobject * s;
+		myobject * a;
+		double * b;
+		s = new myobject[n];
+		a = s;
+		b = (double *)ptr;
+		for (i = 0; i < n; i++) {
+			*a++ = *b++;
+		}
+		data.length = n;
+		data.ptr = (void *)s;
+	}
+}
+// repeat function:
+myobject::myobject(myobject& ob, SIZE_T n) {
+	SIZE_T i;
+	myobject * s;
+	myobject * a;
+	MAKE_EMPTY_SEQ();
+	if (n == 0) {
+		return;
+	}
+	s = new myobject[n];
+	a = s;
+	for (i = 0; i < n; i++) {
+		*a++ = ob;
+	}
+	data.length64 = (unsigned long long)n;
+	data.ptr = (void *)s;
+}
+
+myobject repeat(myobject& ob, SIZE_T n) {
+	myobject s(ob, n);
+	return s;
+}
+
+
+// concat function: (allows atom(a) and atom(b) to be concatenated)
+myobject::myobject(myobject& a, myobject& b) {
+	myobject * s;
+	if (IS_ATOM(a.data)) {
+		if (IS_ATOM(b.data)) {
+			SIZE_T n;
+			n = 2;
+			s = new myobject[n];
+			s[0] = a;
+			s[1] = b;
+			MAKE_EMPTY_SEQ();
+			data.length64 = (unsigned long long)n;
+			data.ptr = (void *)s;
+			return;
+		}
+		else {
+			SIZE_T len, n, i;
+			myobject * _a;
+			myobject * _b;
+			len = LENGTH(b.data);
+			n = len;
+			n++;
+			s = new myobject[n];
+			_a = s;
+			_b = (myobject *)b.data.ptr;
+			s[0] = a;
+			_a++;
+			for (i = 0; i < len; i++) {
+				*_a++ = *_b++;
+			}
+			MAKE_EMPTY_SEQ();
+			data.length64 = (unsigned long long)n;
+			data.ptr = (void *)s;
+			return;
+		}
+	}
+	else {
+		if (IS_ATOM(b.data)) {
+			SIZE_T len, n, i;
+			myobject * _a;
+			myobject * _b;
+			len = LENGTH(a.data);
+			n = len;
+			n++;
+			s = new myobject[n];
+			_a = s;
+			_b = (myobject *)a.data.ptr;
+			s[len] = b;
+			for (i = 0; i < len; i++) {
+				*_a++ = *_b++;
+			}
+			MAKE_EMPTY_SEQ();
+			data.length64 = (unsigned long long)n;
+			data.ptr = (void *)s;
+			return;
+		}
+		else {
+			// both "a" and "b" are sequences
+			SIZE_T alen, blen, n, i;
+			myobject * _a;
+			myobject * _b;
+			alen = LENGTH(a.data);
+			blen = LENGTH(b.data);
+			n = alen + blen;
+			if (n == 0) {
+				MAKE_EMPTY_SEQ();
+				return;
+			}
+			s = new myobject[n];
+			_a = s;
+			_b = (myobject *)a.data.ptr;
+			for (i = 0; i < alen; i++) {
+				*_a++ = *_b++;
+			}
+			_b = (myobject *)b.data.ptr;
+			for (i = 0; i < blen; i++) {
+				*_a++ = *_b++;
+			}
+			MAKE_EMPTY_SEQ();
+			data.length64 = (unsigned long long)n;
+			data.ptr = (void *)s;
+			return;
+		}
+	}
+}
+
+myobject myobject::slice(long long start = 1, long long stop = -1) {
+	// NOTICE: seq indexes start at 1, offsets start at 0, a[0] is the first element
+	// subscripting, starts at 1, example subscript = a.slice(1,-1);
+	myobject t;
+	long long tmp;
+	SIZE_T len; // len is only "long long" in the "slice()" function, everywhere else it is "SIZE_T"
+	if (IS_ATOM(data)) {
+		exit(1);
+	}
+	len = LENGTH(data);
+	tmp = (long long)len;
+	if (start < 0) {
+		start++;
+		start += tmp;
+	}
+	if (stop < 0) {
+		stop++;
+		stop += tmp;
+	}
+	if (start > stop) {
+		if ((start - stop) == 1) {
+			// return the empty sequence:
+			return t;
+		}
+		else {
+			exit(1);
+		}
+	}
+	if (start > tmp) {
+		exit(1);
+	}
+	if (stop > tmp) {
+		exit(1);
+	}
+	if (start < 0) {
+		exit(1);
+	}
+	if (stop < 0) {
+		exit(1);
+	}
+	else {
+		myobject * s;
+		SIZE_T i, b, e;
+		myobject * _a;
+		myobject * _b;
+		b = (SIZE_T)start;
+		e = (SIZE_T)stop;
+		len = e - b;
+		len++;
+		s = new myobject[len];
+		_a = s;
+		_b = (myobject *)data.ptr;
+		_b += b;
+		_b--;
+		for (i = b - 1; i < e; i++) {
+			*_a++ = *_b++;
+		}
+		t.data.length64 = (unsigned long long)len;
+		t.data.ptr = (void *)s;
+		return t;
+	}
+	//return t;
+}
+
+
+void myobject::set_duplicate_count(unsigned long long count = 0) {
+	data.count = (unsigned int)count;
+	if (IS_SEQUENCE(data)) {
+		SIZE_T len;
+		len = LENGTH(data);
+		if (len > 0) {
+			if (data.ptr != NULL) {
+				SIZE_T i;
+				myobject * a = (myobject *)data.ptr;
+				for (i = 0; i < len; i++) {
+					a->set_duplicate_count(count);
+					a++;
+				}
+			}
+		}
+	}
+}
+
+object myobject::dup_myobject(void * up = NULL, myobject * node = NULL) {
+// status: should work.
+
+// dup_object() copies the entire data to an object, replacing element with node when necessary
+// I'm taking it from "root" and copying everything down-stream
+/*	if (IS_COPY(data)) { // new variable
+		// remove this "sheet of paper" (copy) from the rest of them
+		data.count--;
+
+	}*/
+	myobject ob;
+	if (IS_DONT_COPY(data)) { // dont_copy is the element we are replacing in this copy
+		data.is_dont_copy = 0;
+		ob.data = node->dup_myobject(up, NULL);
+		//ob.data.up = up;
+		// count has to be the same, equal to zero (0)
+		//ob.set_duplicate_count(0);
+		//ob.data.count = 0;
+		return ob.data;
+	}
+	ob.data = data;
+	ob.data.up = up;
+	ob.data.count = 0;
+	if (IS_ATOM(data)) {
+		return ob.data;
+	}
+	else if (LENGTH(data) == 0) {
+		return ob.data;
+	}
+	else {
+		myobject * a;
+		myobject * b;
+		SIZE_T i, len;
+
+		len = LENGTH(data);
+		a = new myobject[len]; // what is the "up" of "c", ob's "up" ? NULL
+		ob.data.ptr = (void *)a;
+		b = (myobject *)data.ptr;
+		for (i = 0; i < len; i++) {
+			a->data = b->dup_myobject(&ob, node); // "up" of the duplicated object is ob
+			a++;
+			b++;
+		}
+		return ob.data;
+
+		//ob.ptr; // already set
+		//ob.length64; // they would have the same length
+
+		// these three variables are new:
+
+		//ob.count;
+		//ob.up;
+		//ob.is_dont_copy;
+
+
+		//ob.is_integer; // they would have the same type flags
+		//ob.is_atom; // they would have the same type flags
+	}
+}
+
+
+// Access functions:
+
+SIZE_T const myobject::length() {
+	return LENGTH(data);
+}
+
+long long const myobject::i64() {
+	return data.i64;
+}
+double const myobject::dbl() {
+	return data.dbl;
+}
+
+// Boolean functions:
+bool const myobject::is_atom() {
+	return IS_ATOM(data);
+}
+bool const myobject::is_dbl() {
+	if (IS_ATOM(data)) {
+		return IS_INTEGER(data) == 0;
+	}
+	return false;
+}
+bool const myobject::is_integer() {
+	if (IS_ATOM(data)) {
+		return IS_INTEGER(data) == 1;
+	}
+	return false;
+}
+bool const myobject::is_seq() {
+	return IS_SEQUENCE(data);
+}
+
+
+myobject and_bits(myobject& a, myobject& b) {
+	return a & b;
+}
+myobject or_bits(myobject& a, myobject& b) {
+	return a | b;
+}
+myobject xor_bits(myobject& a, myobject& b) {
+	return a ^ b;
+}
+myobject not_bits(myobject& a) {
+	return ~ a;
+}
+
+myobject& myobject::append(myobject& x) {
+	myobject t(x, 1);
+	myobject s(*this, t);
+	t.delete_myobject();
+	*this = s;
+	s.delete_myobject();
+	return *this;
+}
+myobject& myobject::prepend(myobject& x) {
+	myobject t(x, 1);
+	myobject s(t, *this);
+	t.delete_myobject();
+	*this = s;
+	s.delete_myobject();
+	return *this;
+}
+
+
+myobject remainder(myobject& num, myobject& den) {
+	if (num.is_atom()) {
+		if (den.is_atom()) {
+			if (num.is_integer()) {
+				if (den.is_integer()) {
+					myobject a(num.i64() % den.i64());
+					return a;
+				}
+				else {
+					myobject a(fmod((double)num.i64(), den.dbl()));
+					return a;
+				}
+			}
+			else {
+				if (den.is_integer()) {
+					myobject a(fmod(num.dbl(), (double)den.i64()));
+					return a;
+				}
+				else {
+					myobject a(fmod(num.dbl(), den.dbl()));
+					return a;
+				}
+			}
+		}
+		else {
+			// num is atom
+			// den is sequence
+			SIZE_T i, len;
+			myobject a;
+			myobject * b;
+			object c = { 0,0 }; // no constructor for "object"
+			len = den.length();
+			if (len == 0) {
+				return a;
+			}
+			b = new myobject[len];
+			c.ptr = (void *)b;
+			c.length = len;
+			for (i = 0; i < len; i++) {
+				*b++ = remainder(num, den[i]);
+			}
+			// equal symbol to a primitive "object"
+			a = c;
+			return a;
+		}
+	}
+	else {
+		if (den.is_atom()) {
+			// num is sequence
+			// den is atom
+			SIZE_T i, len;
+			myobject a;
+			myobject * b;
+			object c = { 0,0 }; // no constructor for "object"
+			len = num.length();
+			if (len == 0) {
+				return a;
+			}
+			b = new myobject[len];
+			c.ptr = (void *)b;
+			c.length = len;
+			for (i = 0; i < len; i++) {
+				*b++ = remainder(num[i], den);
+			}
+			// equal symbol to a primitive "object"
+			a = c;
+			return a;
+		}
+		else {
+			// num is sequence
+			// den is sequence
+			SIZE_T i, len;
+			myobject a;
+			myobject * b;
+			object c = { 0,0 }; // no constructor for "object"
+			len = num.length();
+			if (len != den.length()) {
+				exit(1);
+			}
+			if (len == 0) {
+				return a;
+			}
+			b = new myobject[len];
+			c.ptr = (void *)b;
+			c.length = len;
+			for (i = 0; i < len; i++) {
+				*b++ = remainder(num[i], den[i]);
+			}
+			// equal symbol to a primitive "object"
+			a = c;
+			return a;
+		}
+	}
+}
+
+
+myobject& myobject::floor_self() {
+	if (IS_ATOM(data)) {
+		if (IS_INTEGER(data)) {
+			return *this;
+		}
+		else {
+			data.dbl = floor(data.dbl);
+			return *this;
+		}
+	}
+	else {
+		SIZE_T i, n;
+		myobject * a;
+		n = LENGTH(data);
+		a = (myobject *)data.ptr;
+		for (i = 0; i < n; i++) {
+			a->floor_self();
+			a++;
+		}
+		return *this;
+	}
+}
+
+myobject floor(myobject& a) {
+	myobject b = a;
+	b.floor_self();
+	return b;
+}
+
+myobject& myobject::to_int() {
+	if (IS_ATOM(data)) {
+		if (IS_INTEGER(data)) {
+			return *this;
+		}
+		else {
+			long long i = (long long)data.dbl;
+			MAKE_EMPTY_SEQ();
+			data.i64 = i;
+			data.is_atom = 1;
+			data.is_integer = 1;
+			return *this;
+		}
+	}
+	else {
+		SIZE_T i, n;
+		myobject * a;
+		n = LENGTH(data);
+		a = (myobject *)data.ptr;
+		for (i = 0; i < n; i++) {
+			a->to_int();
+			a++;
+		}
+		return *this;
+	}
+}
+myobject& myobject::to_float() {
+	if (IS_ATOM(data)) {
+		if (IS_INTEGER(data)) {
+			double dbl = (double)data.i64;
+			MAKE_EMPTY_SEQ();
+			data.dbl = dbl;
+			data.is_atom = 1;
+			return *this;
+		}
+		else {
+			return *this;
+		}
+	}
+	else {
+		SIZE_T i, n;
+		myobject * a;
+		n = LENGTH(data);
+		a = (myobject *)data.ptr;
+		for (i = 0; i < n; i++) {
+			a->to_float();
+			a++;
+		}
+		return *this;
+	}
+}
+char * myobject::to_string() { // takes top-level elements and converts them into a string
+	char * str;
+	char * a;
+	myobject * b;
+	SIZE_T i, len;
+	if (IS_ATOM(data)) {
+		return NULL;
+	}
+	len = LENGTH(data);
+	str = (char *)calloc(len + 1, 1); // make sure it is a "NULL terminated string"
+	a = str;
+	b = (myobject *)data.ptr;
+	for (i = 0; i < len; i++) {
+		*a++ = (char)b->data.i64;
+		b++;
+	}
+	return str;
+}
+
+myobject& myobject::to_bit(unsigned long long bits) {
+	unsigned long long n;
+	if (bits > 64) {
+		exit(1);
+	}
+	n = 64 - bits;
+	if (IS_ATOM(data)) {
+		if (IS_INTEGER(data)) {
+			data.i64 = data.i64 << n;
+			data.i64 = data.i64 >> n;
+			return *this;
+		}
+		else {
+			long long i = (long long)data.dbl;
+			i = i << n;
+			i = i >> n;
+			MAKE_EMPTY_SEQ();
+			data.i64 = i;
+			data.is_atom = 1;
+			data.is_integer = 1;
+			return *this;
+		}
+	}
+	else {
+		SIZE_T i, len;
+		myobject * a;
+		len = LENGTH(data);
+		a = (myobject *)data.ptr;
+		for (i = 0; i < len; i++) {
+			a->to_bit(bits);
+			a++;
+		}
+		return *this;
+	}
+}
+
+/*
+void div_rem(myobject * d, myobject * r, myobject num, myobject den) {
+
+}
+// lldiv
+*/
+
+/*
+procedure recursive_walk(object x)
+	if atom(x) then
+		printf(1,"%g", x)
+		return
+	elsif length(x) = 0 then
+		puts(1,"{}")
+		return
+	end if
+	puts(1,"{")
+	recursive_walk(x[1])
+	for i = 2 to length(x) do
+		puts(1,",")
+		recursive_walk(x[i])
+	end for
+	puts(1,"}")
+end procedure
+*/
+
+void myobject::print() {
+	if (IS_ATOM(data)) {
+		if (IS_INTEGER(data)) {
+			printf_s("%lli", data.i64);
+			return;
+		}
+		else {
+			printf_s("%g", data.dbl);
+			return;
+		}
+	}
+	else if (LENGTH(data) == 0) {
+		printf_s("{}");
+		return;
+	}
+	else {
+		SIZE_T i, len;
+		myobject * a;
+		printf_s("{");
+		a = (myobject *)data.ptr;
+		a->print();
+		len = LENGTH(data);
+		for (i = 1; i < len; i++) {
+			a++;
+			printf_s(",");
+			a->print();
+		}
+		printf_s("}");
+	}
+}
+
+unsigned long long myobject::find(myobject& a) {
+	if (IS_ATOM(data)) {
+		exit(1);
+	}
+	else {
+		unsigned long long i, len;
+		myobject * b;
+		b = (myobject *)data.ptr;
+		len = LENGTH(data);
+		for (i = 0; i < len; i++) {
+			if (equal(*b, a)) {
+				i++;
+				return i;
+			}
+			b++;
+		}
+		return 0;
+	}
+}

@@ -1,0 +1,105 @@
+# depslib dependency file v1.0
+1510865932 source:/home/james/project1/myobject_h/dup.cpp
+	"stdafx.h"
+	"dup.h"
+	"obj.h"
+
+1510857902 /home/james/project1/myobject_h/stdafx.h
+	<stdio.h>
+	<stdlib.h>
+	<string.h>
+	<math.h>
+	<stddef.h>
+	<deque>
+	<iostream>
+	<sstream>
+	<string>
+
+1510782080 /home/james/project1/myobject_h/targetver.h
+
+1510782117 /home/james/project1/myobject_h/dup.h
+
+1510868269 /home/james/project1/myobject_h/obj.h
+
+1510875041 source:/home/james/project1/myobject_h/iter.cpp
+	"stdafx.h"
+	"dup.h"
+	"iter.h"
+	"obj.h"
+
+1510875054 /home/james/project1/myobject_h/iter.h
+
+1510868995 source:/home/james/project1/myobject_h/main.cpp
+	"stdafx.h"
+	"dup.h"
+	"iter.h"
+	"obj.h"
+
+1510780667 /home/james/project1/myobject_h/myeuphoria.cpp
+	"stdafx.h"
+	"dup.h"
+	"iter.h"
+	"obj.h"
+
+1510783575 source:/home/james/project1/myobject_h/myeuphoria.cpp
+	"stdafx.h"
+	"dup.h"
+	"iter.h"
+	"obj.h"
+
+1510872863 source:/home/james/project1/myobject_h/obj.cpp
+	"stdafx.h"
+	"dup.h"
+	"obj.h"
+
+1510780667 source:/home/james/project1/myobject_h/stdafx.cpp
+	"stdafx.h"
+
+1510879444 source:/home/owner/myobject_h-master/dup.cpp
+	"stdafx.h"
+	"dup.h"
+	"obj.h"
+
+1511052074 /home/owner/myobject_h-master/stdafx.h
+	<stdio.h>
+	<stdlib.h>
+	<string.h>
+	<math.h>
+	<stddef.h>
+	<list>
+	<deque>
+	<iostream>
+	<sstream>
+	<string>
+
+1510961930 /home/owner/myobject_h-master/dup.h
+
+1511111558 /home/owner/myobject_h-master/obj.h
+
+1510947077 source:/home/owner/myobject_h-master/iter.cpp
+	"stdafx.h"
+	"dup.h"
+	"iter.h"
+	"obj.h"
+
+1510947020 /home/owner/myobject_h-master/iter.h
+
+1511118805 source:/home/owner/myobject_h-master/main.cpp
+	"stdafx.h"
+	"dup.h"
+	"obj.h"
+
+1510879444 source:/home/owner/myobject_h-master/myeuphoria.cpp
+	"stdafx.h"
+	"dup.h"
+	"iter.h"
+	"obj.h"
+
+1510879444 source:/home/owner/myobject_h-master/stdafx.cpp
+	"stdafx.h"
+
+1511118441 source:/home/owner/myobject_h-master/obj.cpp
+	"stdafx.h"
+	"dup.h"
+	"obj.h"
+

@@ -1,0 +1,58 @@
+#line 1"C:\\Users\\Owner\\OneDrive\\Documents\\Visual Studio 2017\\Projects\\myeuphoria\\myeuphoria\\myeuphoria.rc"
+#line 1
+// Microsoft Visual C++ generated resource script.
+//
+#include "resource.h"
+#line 5
+#define APSTUDIO_READONLY_SYMBOLS
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 2 resource.
+//
+#include "winres.h"
+#line 12
+/////////////////////////////////////////////////////////////////////////////
+#undef APSTUDIO_READONLY_SYMBOLS
+#line 15
+/////////////////////////////////////////////////////////////////////////////
+// English (United States) resources
+#line 18
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)
+LANGUAGE 9, 1
+#line 21
+#ifdef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// TEXTINCLUDE
+//
+#line 27
+1 TEXTINCLUDE
+BEGIN
+"resource.h\0"
+END
+#line 32
+2 TEXTINCLUDE  
+BEGIN
+"#include ""winres.h""\r\n"
+"\0"
+END
+#line 38
+3 TEXTINCLUDE  
+BEGIN
+"\r\n"
+"\0"
+END
+#line 44
+#endif    // APSTUDIO_INVOKED
+#line 46
+#endif    // English (United States) resources
+/////////////////////////////////////////////////////////////////////////////
+#line 51
+#ifndef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 3 resource.
+//
+#line 58
+/////////////////////////////////////////////////////////////////////////////
+#endif    // not APSTUDIO_INVOKED
